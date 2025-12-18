@@ -1,10 +1,11 @@
-// TaskApp.tsx
+// src/TaskApp.tsx
 import { useEffect, useMemo, useState } from "react";
 import Modal from "./Modal";
 import Sidebar from "./Sidebar";
 import { useAuthFetch } from "./hooks/useAuthFetch";
 
-const API = "/api";
+
+const API = "http://localhost:8000/api"; 
 
 export type Priority = "low" | "medium" | "high";
 export type TaskStatus = "todo" | "in_progress" | "done" | "blocked" | "archived";
@@ -20,11 +21,6 @@ export type TaskRow = {
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "blocked", "archived"];
 const PRIOS: Priority[] = ["low", "medium", "high"];
 
-export type Counts = {
-  total: number;
-  byStatus: Record<TaskStatus, number>;
-};
-
 export default function TaskApp() {
   const authFetch = useAuthFetch();
 
@@ -37,69 +33,89 @@ export default function TaskApp() {
   const [q, setQ] = useState("");
   const [isNewOpen, setNewOpen] = useState(false);
 
-  // Fetch tasks
+  
   const reload = async () => {
-    const url = q ? `${API}/tasks?q=${encodeURIComponent(q)}` : `${API}/tasks`;
-    const data: TaskRow[] = await authFetch(url).then(r => r.json());
-    setTasks(data);
+    try {
+      const url = q ? API + "/tasks?q=" + encodeURIComponent(q) : API + "/tasks";
+      const res = await authFetch(url);
+      if (res.ok) {
+        const data: TaskRow[] = await res.json();
+        setTasks(data);
+      }
+    } catch (err) {
+      console.error("Yükleme hatası:", err);
+    }
   };
 
-  useEffect(() => { reload(); }, []);      // initial load
+  useEffect(() => { reload(); }, []);
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      reload();
-    }
-  }, [q]);    // refetch on search
+    if (token) reload();
+  }, [q]);
 
-  // Type-safe editing task
-  const editing: TaskRow | null = editId !== null
-    ? tasks.find(t => t.id === editId) || null
-    : null;
-
-  // Filtered tasks
+  
   const visible = useMemo(() => {
     return filter === "all" ? tasks : tasks.filter(t => t.status === filter);
   }, [tasks, filter]);
 
-  // Type-safe counts
-  const counts: Counts = useMemo(() => {
-    const base: Counts = {
-      total: tasks.length,
-      byStatus: { todo: 0, in_progress: 0, done: 0, blocked: 0, archived: 0 }
-    };
-    tasks.forEach(t => base.byStatus[t.status]++);
+  const counts = useMemo(() => {
+    const base = { total: tasks.length, byStatus: { todo: 0, in_progress: 0, done: 0, blocked: 0, archived: 0 } };
+    tasks.forEach(t => base.byStatus[t.status as TaskStatus]++);
     return base;
   }, [tasks]);
 
-  // CRUD operations
+  
   const apiAdd = async (title: string, priority: Priority, status: TaskStatus) => {
-    await authFetch(`${API}/tasks`, {
-      method: "POST",
-      body: JSON.stringify({ title, priority, status })
-    });
-    await reload();
+    try {
+      const res = await authFetch(API + "/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, priority, status })
+      });
+      if (res.ok) await reload();
+    } catch (err) {
+      console.error("İstek hatası:", err);
+    }
   };
 
   const apiUpdate = async (id: number, patch: Partial<TaskRow>) => {
-    await authFetch(`${API}/tasks/${id}`, {
+    await authFetch(API + "/tasks/" + id, {
       method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch)
     });
     await reload();
   };
 
   const apiDelete = async (id: number) => {
-    await authFetch(`${API}/tasks/${id}`, { method: "DELETE" });
-    await reload();
-  };
+  try {
+    const res = await authFetch(API + "/tasks/" + id, { 
+      method: "DELETE" 
+    });
+    
+    if (res.ok) {
+      console.log("🗑️ Görev silindi, liste yenileniyor...");
+      await reload(); 
+    }
+  } catch (err) {
+    console.error("Silme işlemi başarısız:", err);
+  }
+};
 
   const addFromModal = async () => {
     const title = draftTitle.trim();
     if (!title) return;
-    await apiAdd(draftTitle, draftPriority, draftStatus);
+    await apiAdd(title, draftPriority, draftStatus);
     setDraftTitle(""); setDraftPriority("medium"); setDraftStatus("todo"); setNewOpen(false);
   };
+
+  const filteredVisible = visible.filter(t =>
+    !q || t.title.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const editing: TaskRow | null = editId !== null
+    ? tasks.find(t => t.id === editId) || null
+    : null;
 
   const saveEdit = async (fields: Partial<{ title: string; priority: Priority; status: TaskStatus }>) => {
     if (!editing) return;
@@ -107,12 +123,9 @@ export default function TaskApp() {
     setEditId(null);
   };
 
-  const filteredVisible = visible.filter(t =>
-    !q || t.title.toLowerCase().includes(q.toLowerCase())
-  );
-
+  
   return (
-    <div style={{ display: "flex", gridTemplateColumns: "220px 1fr", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Sidebar
         active={filter}
         counts={counts}
@@ -125,7 +138,7 @@ export default function TaskApp() {
         }}
       />
 
-      <main style={{ maxWidth: 980, margin: "0 auto", padding: "24px 24px" }}>
+      <main style={{ maxWidth: 980, margin: "0 auto", padding: "24px 24px", flex: 1 }}>
         <h2 style={{ margin: 0 }}>Task Manager</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
           <input id="q" value={q} onChange={e => setQ(e.target.value)} placeholder="Search tasks…" style={{ padding: 8, flex: 1 }} />
@@ -147,12 +160,6 @@ export default function TaskApp() {
                 {PRIOS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
 
-              <button onClick={() => {
-                const order: TaskStatus[] = STATUSES;
-                const next = order[(order.indexOf(t.status) + 1) % order.length];
-                apiUpdate(t.id, { status: next });
-              }}>⟳</button>
-
               <button onClick={() => setEditId(t.id)}>✎</button>
               <button onClick={() => apiDelete(t.id)}>✕</button>
             </li>
@@ -160,7 +167,6 @@ export default function TaskApp() {
         </ul>
       </main>
 
-      {/* NEW TASK MODAL */}
       <Modal open={isNewOpen} onClose={() => setNewOpen(false)} title="New Task"
         footer={
           <>
@@ -186,39 +192,15 @@ export default function TaskApp() {
         </div>
       </Modal>
 
-      {/* EDIT TASK MODAL */}
-      <Modal
-        open={!!editing}
-        onClose={() => setEditId(null)}
-        title="Edit Task"
-        footer={
-          <>
-            <button onClick={() => setEditId(null)}>Close</button>
-            <button onClick={() => {
-              if (!editing) return;
-              const title = (document.getElementById("edit-title") as HTMLInputElement)?.value?.trim();
-              const prio = (document.getElementById("edit-prio") as HTMLSelectElement)?.value as Priority;
-              const st = (document.getElementById("edit-status") as HTMLSelectElement)?.value as TaskStatus;
-              saveEdit({ title, priority: prio, status: st });
-            }}>Save</button>
-          </>
-        }
-      >
+      {/* EDIT MODAL */}
+      <Modal open={!!editing} onClose={() => setEditId(null)} title="Edit Task">
         {editing && (
           <div style={{ display: "grid", gap: 10 }}>
             <input id="edit-title" defaultValue={editing.title} style={{ padding: 8 }} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <label>Priority{" "}
-                <select id="edit-prio" defaultValue={editing.priority}>
-                  {PRIOS.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
-              <label>Status{" "}
-                <select id="edit-status" defaultValue={editing.status}>
-                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </label>
-            </div>
+            <button onClick={() => {
+              const title = (document.getElementById("edit-title") as HTMLInputElement).value;
+              saveEdit({ title });
+            }}>Save</button>
           </div>
         )}
       </Modal>

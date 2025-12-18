@@ -18,7 +18,7 @@ export function useAuthFetch() {
       Authorization: token ? `Bearer ${token}` : "", 
     }
 
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const res = await fetch(endpoint, {
       ...options,
       headers,
     })

@@ -1,92 +1,176 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import type { CSSProperties } from "react"
 
-
-// Renamed to LoginPage for clarity
-export default function LoginPage() { 
-  const [username, setUsername] = useState("") 
+export default function LoginPage() {
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
   const navigate = useNavigate()
 
-  // 1. Check for existing token on mount
+  // Redirect to tasks if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token")
-    if (token) {
-      // If a token exists, the user is likely logged in. Redirect them.
-      navigate("/tasks")
-    }
+    if (token) navigate("/tasks")
   }, [navigate])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-
-    // Reset error message on new attempt
     setError("")
+    setLoading(true)
 
-    const res = await fetch("http://localhost:8000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    })
+    try {
+      const res = await fetch("http://localhost:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
 
-    const data = await res.json()
+      const data = await res.json()
 
-    if (!res.ok) {
-      // Backend returns 401 for bad credentials
-      setError(data.error || "Login failed. Check username and password.") 
-      return
+      if (!res.ok) {
+        setError(data.error || "Invalid username or password")
+        setLoading(false)
+        return
+      }
+
+      // UPDATE: Save authentication data to local storage
+      localStorage.setItem("token", data.token)
+      localStorage.setItem("userId", data.userId)
+
+      // UPDATE: Redirect by refreshing the page
+      // This ensures the TaskApp component reads the fresh token immediately.
+      window.location.href = "/tasks";
+
+    } catch (err) {
+      setError("Something went wrong. Please try again.")
+      console.error("Login error:", err)
+    } finally {
+      setLoading(false)
     }
-
-    // 2. Save JWT token (renamed to 'accessToken' in the prompt, using 'token' for consistency with your code)
-    localStorage.setItem("token", data.token) 
-    localStorage.setItem("userId", data.userId)
-
-    // Redirect to tasks page
-    navigate("/tasks")
   }
 
   return (
-    <form onSubmit={handleLogin} style={{ 
-      maxWidth: '400px', 
-      margin: '50px auto', 
-      padding: '20px', 
-      border: '1px solid #ccc', 
-      borderRadius: '8px' 
-    }}>
-      <h2>User Login</h2>
+    <div style={styles.page}>
+      <form onSubmit={handleLogin} style={styles.card}>
+        <h1 style={styles.title}>Welcome back ✨</h1>
+        <p style={styles.subtitle}>Log in to manage your tasks</p>
 
-      <input
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        required
-        style={{ width: '100%', padding: '10px', marginBottom: '15px' }}
-      />
+        <input
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          style={styles.input}
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-        style={{ width: '100%', padding: '10px', marginBottom: '15px' }}
-      />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={styles.input}
+        />
 
-      <button 
-        type="submit"
-        style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-      >
-        Login
-      </button>
+        {error && <p style={styles.error}>{error}</p>}
 
-      {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
-      
-      {/* Optional: Add a link to the Register page if you implement it */}
-      {/* <p style={{ marginTop: '15px', textAlign: 'center' }}>
-        Don't have an account? <a href="/register">Register here</a>
-      </p> */}
-    </form>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            ...styles.button,
+            opacity: loading ? 0.7 : 1,
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+
+        <p style={styles.footerText}>
+          Don’t have an account?{" "}
+          <span
+            style={styles.link}
+            onClick={() => navigate("/register")}
+          >
+            Register
+          </span>
+        </p>
+      </form>
+    </div>
   )
 }
+
+/* =======================
+   Typed Styles
+======================= */
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    height: "100vh",
+    width: "100vw",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "linear-gradient(135deg, #fdfbfb, #ebedee)",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "380px",
+    padding: "32px",
+    borderRadius: "16px",
+    backgroundColor: "#ffffff",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+    textAlign: "center",
+  },
+  title: {
+    marginBottom: "4px",
+    fontSize: "1.8rem",
+    fontWeight: "bold",
+  },
+  subtitle: {
+    marginBottom: "24px",
+    color: "#666",
+    fontSize: "0.95rem",
+  },
+  input: {
+    width: "100%",
+    padding: "12px",
+    marginBottom: "14px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    fontSize: "0.95rem",
+    outline: "none",
+    boxSizing: "border-box", // Prevents input overflow
+  },
+  button: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "10px",
+    border: "none",
+    backgroundColor: "#6c63ff",
+    color: "#fff",
+    fontSize: "1rem",
+    marginTop: "10px",
+    transition: "background-color 0.2s",
+  },
+  error: {
+    color: "#d64545",
+    fontSize: "0.85rem",
+    marginBottom: "8px",
+  },
+  footerText: {
+    marginTop: "20px",
+    fontSize: "0.85rem",
+    color: "#666",
+  },
+  link: {
+    color: "#6c63ff",
+    cursor: "pointer",
+    fontWeight: 500,
+  },
+}
+
 

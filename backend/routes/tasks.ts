@@ -1,125 +1,72 @@
-import { Hono } from "npm:hono"
-import { eq, and } from "npm:drizzle-orm" // Import 'and' for complex WHERE clauses
-import { orm } from "../db/drizzle.ts"
-import { tasks } from "../db/schema.ts"
-import { saveDb } from "../db/connection.ts"
-import { authMiddleware, CustomVariables } from "./auth.ts" // Assuming auth.ts is in the same directory
+// backend/routes/tasks.ts
+import { Hono } from "npm:hono@4.10.4";
+import { sqlDb, saveDb } from "../db/connection.ts";
+import { authMiddleware } from "./auth.ts"; // Ensure this import is correct
 
-export const tasksRoute = new Hono<{ Variables: CustomVariables }>();
+// 1. Setup the route with Type Safety for userId
+export const tasksRoute = new Hono<{ Variables: { userId: number } }>();
 
-// Apply the middleware to ALL routes on the tasksRoute
-// All routes below this line will require a valid JWT, 
-// and the c.get("userId") will be available.
-tasksRoute.use("/*", authMiddleware)
+// 2. ACTIVATE THE SECURITY GUARD
+// This is the most important line. It must be ABOVE the routes.
+tasksRoute.use("*", authMiddleware);
 
-// =======================
-// GET /api/tasks?q=keyword
-// =======================
+// 3. LIST TASKS (GET)
 tasksRoute.get("/", async (c) => {
-    // Retrieve the userId from the context (set by authMiddleware)
-    const userId = c.get("userId")
-    const q = (c.req.query("q") ?? "").toLowerCase()
-    
-    // Select ONLY tasks belonging to the current user
-    let rows = await orm
-        .select()
-        .from(tasks)
-        .where(eq(tasks.userId, userId)) // Scope by userId
-        .all()
-    
-    // Apply search filter if query 'q' is present
-    if (q) rows = rows.filter((r) => r.title.toLowerCase().includes(q))
-    
-    return c.json(rows)
-})
+  try {
+    const userId = c.get("userId"); // Now dynamic
+    console.log(`🔍 Checking tasks for user: ${userId}`);
 
-// =======================
-// POST /api/tasks
-// =======================
+    const stmt = sqlDb.prepare("SELECT * FROM tasks WHERE userId = ? ORDER BY id DESC");
+    stmt.bind([userId]);
+
+    const results = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+
+    return c.json(results);
+  } catch (err: any) {
+    console.error("❌ GET Error:", err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 4. CREATE TASK (POST)
 tasksRoute.post("/", async (c) => {
-    // Retrieve the userId from the context
-    const userId = c.get("userId")
-    const body = await c.req.json().catch(() => ({}))
-    const title = String(body.title ?? "").trim()
-    
-    if (!title) return c.json({ error: "title required" }, 400)
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { title, priority, status } = body;
+    const userId = c.get("userId"); // Now dynamic
 
-    const priority = (body.priority ?? "medium") as string
-    const status = (body.status ?? "todo") as string
-    const module = (body.module ?? null) as string | null
+    console.log(`📝 Saving task: "${title}" for user: ${userId}`);
 
-    const inserted = await orm
-        .insert(tasks)
-        // Ensure the new task is associated with the current user
-        .values({ title, priority, status, module, userId }) 
-        .returning()
-        .get()
+    sqlDb.run(
+      "INSERT INTO tasks (title, userId, status, priority, module) VALUES (?, ?, ?, ?, ?)",
+      [title, userId, status || "todo", priority || "medium", null]
+    );
 
-    await saveDb()
+    await saveDb(); 
+    return c.json({ success: true, message: "Task saved" }, 201);
+  } catch (err: any) {
+    console.error("❌ POST Error:", err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
 
-    const headers = new Headers()
-    headers.set("location", `/api/tasks/${inserted.id}`)
-    return new Response(JSON.stringify(inserted), {
-        status: 201,
-        headers,
-    })
-})
-
-// =======================
-// PUT /api/tasks/:id
-// =======================
-tasksRoute.put("/:id", async (c) => {
-    const userId = c.get("userId")
-    const id = Number(c.req.param("id"))
-    
-    if (!Number.isFinite(id)) return c.json({ error: "invalid id" }, 400)
-
-    const patch = await c.req.json().catch(() => ({}))
-    // Destructure to prevent user from trying to change the ID or userId
-    const { id: _ignoreId, userId: _ignoreUserId, ...safePatch } = patch 
-
-    // Update operation: Must match BOTH task ID and userId to ensure ownership
-    await orm.update(tasks)
-        .set(safePatch)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-        .run()
-        
-    // Select the updated task to return to the client
-    const updated = await orm.select()
-        .from(tasks)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-        .get()
-        
-    await saveDb()
-
-    if (!updated) {
-        // Return 404 if not found OR 403 if they try to update another user's task
-        return c.json({ error: "Task not found or unauthorized" }, 404) 
-    }
-    return c.json(updated)
-})
-
-// =======================
-// DELETE /api/tasks/:id
-// =======================
+// 5. DELETE TASK (DELETE)
 tasksRoute.delete("/:id", async (c) => {
-    const userId = c.get("userId")
-    const id = Number(c.req.param("id"))
-    
-    if (!Number.isFinite(id)) return c.json({ error: "invalid id" }, 400)
+  try {
+    const id = c.req.param("id");
+    const userId = c.get("userId"); // Now dynamic
 
-    // Delete operation: Must match BOTH task ID and userId
-    const result = await orm.delete(tasks)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-        .run()
-    
-    const deleteResult = result as unknown as { changes: number };
-    // In Drizzle SQLite, result.changes is the number of affected rows
-    if (deleteResult.changes === 0) {
-         // Same logic as PUT: not found or not owned
-        return c.json({ error: "Task not found or unauthorized" }, 404) 
-    }
-    
-    await saveDb()
-    return c.json({ ok: true })
-})
+    // Security: Only delete if the ID matches AND it belongs to this user
+    sqlDb.run("DELETE FROM tasks WHERE id = ? AND userId = ?", [id, userId]);
+
+    await saveDb();
+    return c.json({ success: true });
+  } catch (err: any) {
+    console.error("❌ DELETE Error:", err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});

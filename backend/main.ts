@@ -1,14 +1,11 @@
-// backend/main.ts
 import { Hono } from "npm:hono@4.10.4"
 import { cors } from "npm:hono@4.10.4/cors"
 import { tasksRoute } from './routes/tasks.ts';
-
 import authRouter from "./routes/auth.ts"
 import { logger } from "./middleware/logger.ts"
-import { DB_URL, PORT } from "./config/env.ts"
+import { PORT } from "./config/env.ts"
 
-console.log(`DB_URL = ${DB_URL}`)
-console.log(`Server starting on port ${PORT}`)
+
 
 const app = new Hono()
 
@@ -22,20 +19,11 @@ app.use(
 
 app.use("*", logger)
 
-app.route("/auth", authRouter);
-app.route("/api/tasks", tasksRoute);
 
-app.get("/api/tasks", (c) =>
-  c.json([
-    {
-      id: 1,
-      title: "Demo",
-      status: "todo",
-      priority: "medium",
-      module: null,
-    },
-  ])
-)
+app.route("/auth", authRouter);
+
+
+app.route("/api/tasks", tasksRoute);
 
 app.get("/api/hello", (c) =>
   c.json({ msg: "Hello from Hono + sql.js ✅" })

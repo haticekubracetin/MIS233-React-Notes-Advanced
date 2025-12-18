@@ -17,6 +17,15 @@ type Props = {
 const ALL: Filter[] = ["all", "todo", "in_progress", "done", "blocked", "archived"];
 
 export default function Sidebar({ active, onPick, counts, onNew, onClearDone }: Props) {
+  
+  
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    
+    window.location.href = "/login";
+  };
+
   return (
     <aside style={aside}>
       <div style={brand}>🗂️ Tasks</div>
@@ -49,6 +58,10 @@ export default function Sidebar({ active, onPick, counts, onNew, onClearDone }: 
 
       <div style={{ marginTop: "auto", display: "grid", gap: 8 }}>
         <button onClick={onClearDone} style={ghost}>Clear “done”</button>
+        
+        
+        <button onClick={handleLogout} style={logoutBtnStyle}>Logout</button>
+
         <div style={{ fontSize: 12, opacity: 0.7 }}>
           Tip: Press <kbd>N</kbd> for new, <kbd>/</kbd> to focus search.
         </div>
@@ -61,6 +74,10 @@ function label(f: Filter) {
   if (f === "in_progress") return "in progress";
   return f;
 }
+
+/* =======================
+   Styles
+======================= */
 
 const aside: React.CSSProperties = {
   width: 220, padding: 16, display: "flex", flexDirection: "column", gap: 12,
@@ -81,4 +98,15 @@ const navBtnActive: React.CSSProperties = {
 };
 const ghost: React.CSSProperties = {
   padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff", cursor: "pointer"
+};
+
+
+const logoutBtnStyle: React.CSSProperties = {
+  padding: "8px 10px", 
+  borderRadius: 10, 
+  border: "1px solid #fecaca", 
+  background: "#fef2f2", 
+  color: "#dc2626", 
+  cursor: "pointer",
+  fontWeight: 500
 };

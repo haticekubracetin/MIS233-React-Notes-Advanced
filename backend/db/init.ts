@@ -1,9 +1,11 @@
-import { object } from "npm:zod";
-import { client } from "./db/connection.ts";
+// backend/init.ts
+import { sqlDb, saveDb } from "./connection.ts"; 
 
-await client.execute(`
+
+sqlDb.run(`
   CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
     title TEXT NOT NULL,
     status TEXT DEFAULT 'todo',
     priority TEXT DEFAULT 'medium',
@@ -11,6 +13,10 @@ await client.execute(`
     created_at INTEGER DEFAULT (strftime('%s','now'))
   );
 `);
+
+
+await saveDb(); 
+
 
 
 

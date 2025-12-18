@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'; // 👈 NEW IMPORTS
+import { useState, useEffect } from 'react'; //  NEW IMPORTS
 import { Routes, Route, Navigate } from "react-router-dom";
 import TaskApp from "./TaskApp";
 import LoginPage from "./LoginPage.tsx";
+import RegisterPage from "./RegisterPage.tsx";
 
 function App() {
   // 1. Initial State: Assume the user is loading until checked.
@@ -51,6 +52,9 @@ function App() {
           isLoggedIn ? <TaskApp /> : <Navigate to="/login" replace />
         }
       />
+
+      <Route path="/register" element={<RegisterPage />} />
+
     </Routes>
   );
 }
