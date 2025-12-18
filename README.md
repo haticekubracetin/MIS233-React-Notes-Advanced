@@ -1,73 +1,46 @@
-# React + TypeScript + Vite
+🚀 Multi-User Task Management System
+A full-stack, secure task management application featuring JWT Authentication, a RESTful API, and a dynamic React frontend.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+🌟 Key Features
+Secure Authentication: User registration and login using JWT (JSON Web Tokens) and Bcrypt password hashing.
 
-Currently, two official plugins are available:
+Multi-User Architecture: Tasks are isolated per user; each user can only access, create, and delete their own data.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Dynamic CRUD: Full Create, Read, Update, and Delete functionality for tasks.
 
-## React Compiler
+State-of-the-Art Backend: Built with Hono on Deno, utilizing a high-performance sql.js (SQLite) database.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Responsive Frontend: Modern UI built with React and custom CSS-in-JS for a clean, professional look.
 
-## Expanding the ESLint configuration
+🏗️ Technical Stack
+Frontend: React, React Router, Custom Hooks (useAuthFetch).
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Backend: Hono Framework, Deno Runtime.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Database: SQLite via sql.js (with physical file persistence).
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Security: Middleware-based route protection, JWT-based session management.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+🛠️ Installation & Setup
+Clone the repository:
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Bash
+git clone <your-repo-link>
+cd <folder-name>
+Start the Backend: Navigate to the backend folder and run:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Bash
+deno run --allow-all main.ts
+The server will start at http://localhost:8000. The SQLite database file will be automatically generated on the first run.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Start the Frontend: Navigate to the frontend folder and run:
+
+Bash
+npm install
+npm run dev
+🔒 Security Implementation
+This project follows industry best practices for security:
+
+Auth Middleware: Every API request to /api/tasks is intercepted by a middleware that verifies the JWT token in the Authorization header.
+
+Database Isolation: All SQL queries are parameterized (using ? placeholders) to prevent SQL Injection attacks and use the userId from the verified token to ensure data privacy.
